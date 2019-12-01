@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Users/Julian/mingw/include/qt5/QtWidgets",
+                "C:/Users/Julian/mingw/include/qt5",
+                "C:/Users/Julian/opencv/build/include"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "gcc-x64",
+            "compilerPath": "C:\\Users\\Julian\\mingw\\bin\\gcc.exe"
+        }
+    ],
+    "version": 4
+}
