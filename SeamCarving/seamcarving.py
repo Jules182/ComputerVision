@@ -1,6 +1,7 @@
 import numpy as np
 import cv2  # OpenCV Library
 import os
+import argparse,sys
 
 import matplotlib.pyplot as plt
 
@@ -52,15 +53,16 @@ def sobel(img):
 
     return magnitude
 
-def find_seams_vertical(img, energy):
+def remove_seam_vertical(img, energy):
     """
-    Find the optimal vertical seam and highlight it on the input image
+    Find the optimal vertical seam and remove it
     Paper: Avidan et al. (2007)
     """
     img_height, img_width = energy.shape
 
     cumulated_min_energy = energy.copy()
-    output = img.copy()
+    output_img = np.zeros((img_height, img_width - 1, 3))
+    output_energy = np.zeros((img_height, img_width - 1))
 
     # compute the cumulative minimum energy M for all possible connected seams
     for row in range(1,img_height):
@@ -74,11 +76,11 @@ def find_seams_vertical(img, energy):
 
     # backtracking to find the path of the optimal seam
     col = np.argmin(cumulated_min_energy[img_height-1,:])
-    for row in reversed(range(0,img_height)):
-        # insert a 2px wide red stroke to mark the seam
-        output[row, col] = [0,0,255]
-        if not col > img_width-3:
-            output[row,col+1] = [0,0,255]
+    for row in reversed(range(img_height-1)):
+
+        # remove the seam in the output and the energy image
+        output_img[row,:] = np.delete(img[row,:], col, 0)
+        output_energy[row,:] = np.delete(energy[row,:], col, 0)
 
         if col == 0:
             col = np.argmin(cumulated_min_energy[row-1, col:col+1]) + col
@@ -87,41 +89,39 @@ def find_seams_vertical(img, energy):
         else:
             col = np.argmin(cumulated_min_energy[row-1, col-1:col+1]) + col-1
 
-    return output
+    return (output_img, output_energy)
 
-
-def resize_img(img, new_height, new_width):
+def resize_img(img, seams_to_remove_x, seams_to_remove_y):
     """
-    Resize an image to a new height x width
+    Resize an image to a new height and width by removing low-energy-pixels (seams)
     """
-    height, width, channels = img.shape
-    # resize
-    seams_to_remove_x = width - new_width
-    seams_to_remove_y = height - new_height
-
     # convert to grayscale
     gray = grayscale(img)
-
-    # plt.imshow(gray, cmap='gray')
-    # plt.title("Gray")
-    # plt.show()
 
     # run sobel operator on the grayscale image
     energy_img = sobel(gray)
 
-    # plt.imshow(energy_img, cmap='gray')
-    # plt.title("Energy function Sobel")
-    # plt.show()
+    # remove the specified number of vertical seams from the image
+    for i in range(seams_to_remove_x):
+        img, energy_img = remove_seam_vertical(img, energy_img)
 
-    # find and mark an optimal seam on the input image
-    img_seam = find_seams_vertical(img, energy_img)
+    # rotate the image to remove horizontal seams
+    img_hor = np.rot90(img)
+    energy_img_hor = np.rot90(energy_img)
     
-    cv2.imshow("optimal seam (x)", img_seam)
-    cv2.waitKey(0)
+    # remove the specified number of horizontal seams from the image
+    for j in range(seams_to_remove_y):
+        img_hor, energy_img_hor = remove_seam_vertical(img_hor, energy_img_hor)
+    
+    # rotate the image back
+    img = np.rot90(img_hor)
+    img = np.rot90(img)
+    img = np.rot90(img)
+    energy_img = np.flip(energy_img_hor)
+    energy_img = np.flip(energy_img)
+    energy_img = np.flip(energy_img)
 
-    # TODO remove seams from image
-
-    return img_seam
+    return img
 
 if __name__ == '__main__':
     input_dir = "./img/input"
@@ -130,6 +130,26 @@ if __name__ == '__main__':
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Get the seams to remove in x- and y-direction
+    # from the command line arguments "-x" and "-y"
+    parser=argparse.ArgumentParser()
+    parser.add_argument('-x', type=int, help='Number of vertical seams to remove')
+    parser.add_argument('-y', type=int, help='Number of horizontal seams to remove')
+    args=parser.parse_args()
+
+    if args.x is None and args.y is None:
+        sys.exit(0)
+
+    seams_to_remove_x = args.x
+    seams_to_remove_y = args.y
+
+    if args.x is None:
+        seams_to_remove_x = 0
+    
+    if args.y is None:
+        seams_to_remove_y = 0
+
+    # rezize every image in the input directory
     for path, _, files in os.walk(input_dir):
         for file in files:
             file_lc = file.lower()
@@ -138,12 +158,13 @@ if __name__ == '__main__':
                 # read file
                 img = cv2.imread(os.path.join(path, file))
                 height, width, _ = img.shape
-                # resize
-                new_height = int(height)
-                new_width = int(width - 1)
-                print(f'resizing {file} to ({new_width}x{new_height})')
-                resized = resize_img(img, new_height, new_width)
-                # write file
-                output_filename = os.path.join(output_dir, f'{img_name}-{new_width}x{new_height}.png')
-                cv2.imwrite(output_filename, resized)
-                print(f'{img_name}-{new_width}x{new_height}.png exported')
+                new_height = int(height - seams_to_remove_y)
+                new_width = int(width - seams_to_remove_x)
+                if new_width >= 1 and new_height >= 1:
+                    print(f'resizing {file} to ({new_width}x{new_height})')
+                    # resize
+                    resized = resize_img(img, seams_to_remove_x, seams_to_remove_y)
+                    # write file
+                    output_filename = os.path.join(output_dir, f'{img_name}-{new_width}x{new_height}.png')
+                    cv2.imwrite(output_filename, resized)
+                    print(f'{img_name}-{new_width}x{new_height}.png exported')
