@@ -9,5 +9,6 @@ It is an implementation of the approach by [Avidan et al., 2007](https://dl.acm.
 python seamcarving.py -x {INTEGER} -y {INTEGER}
 ```
 
-Argument X refers to the number of vertical seams to remove (in x Direction)
-Argument X refers to the number of horizontal seams to remove (in x Direction)
+Argument ```x``` refers to the number of vertical seams to remove (in x direction)
+
+Argument ```y``` refers to the number of horizontal seams to remove (in y direction)
